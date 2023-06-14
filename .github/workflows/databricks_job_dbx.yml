@@ -1,0 +1,67 @@
+name: "ML project deployment"
+on:
+  workflow_call:
+    inputs:
+      deployment-file:
+        required: true
+        description: "dbx deployment file"
+        type: string
+      run-job-now:
+        required: false
+        description: "if yes, runs dbr job now"
+        default: "yes"
+        type: string
+      toolkit-ref:
+        required: true
+        description: "actions version to use"
+        type: string
+
+jobs:
+  deploy_databricks:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Echo inputs
+        id: echo_inputs
+        run: |
+          echo "Branch that was used to start the workflow: ${{ github.ref_name }}"
+          echo "Github workflow started running: $(date +'%Y-%m-%d %H:%M:%S')"
+          echo "Deployment file: ${{ inputs.deployment-file }}"
+          echo "Run job now?: ${{ inputs.run-job-now }}"
+
+      - name: Generate token
+        id: generate_token
+        uses: tibdex/github-app-token@v1
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Setup git token
+        id: setup_git_token
+        shell: bash
+        run: |
+          echo "GIT_TOKEN=${{ steps.generate_token.outputs.token }}" >> $GITHUB_ENV
+
+      - name: Get composite run steps repository
+        id: checkout_marvelous_workflows
+        uses: actions/checkout@v3
+        with:
+          repository: marvelousmlops/marvelous-workflows
+          ref: ${{ inputs.toolkit-ref }}
+          token: ${{ steps.generate_token.outputs.token }}
+          path: actions
+
+      - name: Setup env vars
+        id: setup_env_vars
+        uses: ./actions/.github/actions/setup_env_vars
+        with:
+          databricks_token: ${{ secrets.DATABRICKS_TOKEN }}
+          databricks_host: ${{ secrets.DATABRICKS_HOST }}
+
+      - name: Deploy dbx
+        id: deploy_dbx
+        uses: ./actions/.github/actions/deploy_dbx
+        with:
+          workspace-dir: ${{ format('/Shared/{0}', env.PROJECT_NAME) }}
+          artifact-location: ${{ format('dbfs:/Shared/{0}', env.PROJECT_NAME) }}
+          deployment-file: ${{ inputs.deployment-file}}
+          run-job-now: ${{ inputs.run-job-now}}

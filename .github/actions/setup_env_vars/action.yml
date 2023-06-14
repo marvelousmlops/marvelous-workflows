@@ -1,0 +1,23 @@
+name: setup_env_vars
+description: Setup env vars
+inputs:
+  databricks_host:
+    description: Databricks host
+    required: true
+  databricks_token:
+    description: Databricks token
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup env vars
+      id: setup_env_vars
+      shell: bash
+      run: |
+        echo "GIT_SHA=${{ github.sha }}" >> $GITHUB_ENV
+        echo "DATABRICKS_TOKEN=${{ inputs.databricks_token }}" >> $GITHUB_ENV
+        echo "DATABRICKS_HOST=${{ inputs.databricks_host }}" >> $GITHUB_ENV
+        echo "PROJECT_NAME=$( echo ${{ github.repository }} | cut -d "/" -f2 )" >> $GITHUB_ENV
+
+

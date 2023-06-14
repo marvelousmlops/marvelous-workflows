@@ -1,0 +1,66 @@
+name: deploy_dbx
+description: Deploy dbx
+
+inputs:
+  workspace-dir:
+    required: true
+    description: "Workspace directory on Databricks"
+  artifact-location:
+    required: true
+    description: "Artifact location"
+  deployment-file:
+    required: true
+    description: "dbx deployment file"
+  run-job-now:
+    required: false
+    description: "if yes, runs dbr job now"
+    default: "yes"
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: setup python
+      id: setup_python
+      uses: actions/setup-python@v2
+
+    - name: checkout the project repo
+      id: checkout_repo
+      uses: actions/checkout@v2
+      with:
+        path: project
+
+    - name: install dependencies
+      id: install_dependencies
+      shell: bash
+      run: |
+        pip install databricks-cli
+        pip install dbx
+
+    - name: Configure dbx project.json
+      id: configure_dbx_project
+      shell: bash
+      run: |
+        dbx configure \
+        --workspace-dir "${{ inputs.workspace-dir }}" \
+        --artifact-location "${{ inputs.artifact-location }}"
+        
+    - name: Get job name
+      id: get_job_name
+      shell: bash
+      working-directory: ./project
+      run: |
+        job_name=$(yq eval '.environments.default.workflows[0].name' "${{ inputs.deployment-file }}")
+        echo $job_name
+        echo "job_name=$job_name" >> $GITHUB_OUTPUT
+
+    - name: dbx deploy
+      id: dbx_deploy
+      shell: bash
+      working-directory: ./project
+      run: |
+        dbx deploy --deployment-file="${{ inputs.deployment-file }}"
+        if [[ "${{ inputs.run-job-now }}" == "yes" || "${{ inputs.run-job-now }}" == "True" ]]; \
+        then (dbx launch --job ${{ steps.get_job_name.outputs.job_name }}); fi
+        
+
