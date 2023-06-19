@@ -1,0 +1,68 @@
+name: "Check Databricks job run status"
+on:
+  workflow_call:
+    inputs:
+      run_id:
+        description: Databricks run id
+        required: true
+        type: string
+      toolkit_ref:
+        description: gso ml toolkit version to use
+        required: true
+        default: "master"
+        type: string
+
+jobs:
+  check_dbr_job_run:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Echo inputs
+        id: echo_inputs
+        run: |
+          echo "Branch that was used to start the workflow: ${{ github.ref_name }}"
+          echo "Github workflow started running: $(date +'%Y-%m-%d %H:%M:%S')"
+          echo "Run id: ${{ inputs.run_id }}"
+
+      - name: Generate token
+        id: generate_token
+        uses: tibdex/github-app-token@v1
+        with:
+          app_id: ${{ secrets.GSO_APP_ID }}
+          private_key: ${{ secrets.GSO_APP_PRIVATE_KEY }}
+
+      - name: Setup git token
+        id: setup_git_token
+        shell: bash
+        run: |
+          echo "GIT_TOKEN=${{ steps.generate_token.outputs.token }}" >> $GITHUB_ENV
+
+      - name: Get composite run steps repository
+        id: checkout_marvelous_workflows
+        uses: actions/checkout@v3
+        with:
+            repository: marvelousmlops/marvelous-workflows
+            ref: ${{ inputs.toolkit-ref }}
+            token: ${{ steps.generate_token.outputs.token }}
+            path: actions
+
+      - name: Setup env vars
+        id: setup_env_vars
+        shell: bash
+        run: |
+          echo "DATABRICKS_TOKEN=${{ secrets.DATABRICKS_TOKEN }}" >> $GITHUB_ENV
+          echo "DATABRICKS_HOST=${{ secrets.DATABRICKS_HOST }}" >> $GITHUB_ENV
+
+      - name: install workflow python requirements
+        run: |
+         pip install git+https://x-access-token:${{ env.GIT_TOKEN }}@github.com/RoyalAholdDelhaize/gso-ml-toolkit@${{ inputs.toolkit_ref }}
+         pip install wheel
+        shell: bash
+
+      - name: check status
+        run: |
+         echo ${{ inputs.run_id }}
+         mkdir -p model
+         python -m ml_toolkit.check_dbr_job_run \
+           --run_id ${{ inputs.run_id }} \
+        shell: bash
+ 

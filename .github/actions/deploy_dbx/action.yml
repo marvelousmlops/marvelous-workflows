@@ -15,6 +15,15 @@ inputs:
     required: false
     description: "if yes, runs dbr job now"
     default: "yes"
+    
+outputs:
+  job_id:
+    description: Databricks job id
+    value: ${{ steps.dbx_deploy.outputs.job_id }}
+  run_id:
+    description: Databricks job id
+    value: ${{ steps.dbx_launch.outputs.run_id }}
+
 
 runs:
   using: "composite"
@@ -54,13 +63,35 @@ runs:
         echo $job_name
         echo "job_name=$job_name" >> $GITHUB_OUTPUT
 
+    # - name: dbx deploy
+    #   id: dbx_deploy
+    #   shell: bash
+    #   working-directory: ./project
+    #   run: |
+    #     dbx deploy --deployment-file="${{ inputs.deployment-file }}"
+    #     if [[ "${{ inputs.run-job-now }}" == "yes" || "${{ inputs.run-job-now }}" == "True" ]]; \
+    #     then (dbx launch --job ${{ steps.get_job_name.outputs.job_name }}); fi
+
     - name: dbx deploy
       id: dbx_deploy
       shell: bash
       working-directory: ./project
       run: |
-        dbx deploy --deployment-file="${{ inputs.deployment-file }}"
-        if [[ "${{ inputs.run-job-now }}" == "yes" || "${{ inputs.run-job-now }}" == "True" ]]; \
-        then (dbx launch --job ${{ steps.get_job_name.outputs.job_name }}); fi
-        
+        dbx_deploy_logs="$(dbx deploy --deployment-file="${{ inputs.deployment-file }}")"
+        echo $dbx_deploy_logs
+        job_id=$(echo "$dbx_deploy_logs" | grep -oP "(?<=id: )\d+")
+        echo $job_id
+        echo "job_id=$job_id" >> $GITHUB_OUTPUT
 
+
+    - name: dbx launch
+      if: ${{ inputs.run-job-now == 'yes' || inputs.run-job-now == 'True' }}
+      id: dbx_launch
+      shell: bash
+      working-directory: ./project
+      run: |
+        dbx_launch_logs="$(dbx launch --job "${{ steps.get_job_name.outputs.job_name }}")"
+        echo $dbx_launch_logs
+        run_id=$(echo "$dbx_launch_logs" | grep -oP "(?<=run/)\d+")
+        echo $run_id
+        echo "run_id=$run_id" >> $GITHUB_OUTPUT
