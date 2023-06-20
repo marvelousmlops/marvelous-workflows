@@ -1,0 +1,98 @@
+name: "Dispatch testing"
+
+on:
+  pull_request:
+    branches:
+      - master
+      - develop
+
+  push:
+    branches:
+      - master
+      - develop
+
+  workflow_dispatch:
+    inputs:
+      branch:
+        required: false
+        description: Branch of marvelous-mlops to use
+        type: string
+        default: "master"
+
+
+jobs:
+  test_workflow_push_dev:
+    if: ${{ github.event_name == 'push' && github.ref_name == 'develop' }}
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Echo inputs
+        id: echo_inputs
+        run: |
+          echo "Branch that was used to start the workflow: ${{ github.ref_name }}"
+
+      - name: Generate token
+        id: generate_token
+        uses: tibdex/github-app-token@v1
+        with:
+            app_id: ${{ secrets.APP_ID }}
+            private_key: ${{ secrets.APP_PRIVATE_KEY }}
+  
+
+      - name: Repository Dispatch
+        id: return_dispatch
+        uses: codex-/return-dispatch@v1.7.0
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
+          ref: refs/heads/master # branch of marvelous-workflows-testing to use
+          repo: marvelous-workflows-testing
+          owner: marvelousmlops
+          workflow: test_dbx_reusable_wf_dev.yml
+          workflow_timeout_seconds: 300
+
+      - name: Await Run ID ${{ steps.return_dispatch.outputs.run_id }}
+        uses: Codex-/await-remote-run@v1.0.0
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
+          repo: marvelous-workflows-testing
+          owner: marvelousmlops
+          run_id: ${{ steps.return_dispatch.outputs.run_id }}
+          run_timeout_seconds: 6000
+          poll_interval_ms: 200
+
+
+  test_workflow_push_master:
+    if: ${{ github.event_name == 'push' && github.ref_name == 'master' }}
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Echo inputs
+        id: echo_inputs
+        run: |
+          echo "Branch that was used to start the workflow: ${{ github.ref_name }}"
+
+      - name: Generate token
+        id: generate_token
+        uses: tibdex/github-app-token@v1
+        with:
+          app_id: ${{ secrets.TOOLKIT_TESTING_APP_ID }}
+          private_key: ${{ secrets.TOOLKIT_TESTING_APP_PRIVATE_KEY }}
+
+      - name: Repository Dispatch
+        id: return_dispatch
+        uses: codex-/return-dispatch@v1.7.0
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
+          ref: refs/heads/master # branch of marvelous-workflows-testing to use
+          repo: marvelous-workflows-testing
+          owner: marvelousmlops
+          workflow: test_dbx_reusable_wf_master.yml
+          workflow_timeout_seconds: 300
+
+      - name: Await Run ID ${{ steps.return_dispatch.outputs.run_id }}
+        uses: Codex-/await-remote-run@v1.0.0
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
+          repo: marvelous-workflows-testing
+          owner: marvelousmlops
+          run_id: ${{ steps.return_dispatch.outputs.run_id }}
+          run_timeout_seconds: 6000
+          poll_interval_ms: 200
